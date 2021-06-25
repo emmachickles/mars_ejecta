@@ -1,33 +1,41 @@
 # ==============================================================================
 #
 # 20200914 - cnn.py
-# VGG-inspired CNN for binary classification of ejecta preservation.
+# Train a CNN for binary classification of ejecta preservation.
 # / Emma Chickles
 # Trains a convolutional neural network on scaled and normalized images to
 # output a single value (0 or 1) representing the presence or absence of crater
-# ejecta.
-# Note that this CNN doesn't initialize with the pretrained weights from VGG,
-# just uses the same architecture.
-#
-# TODO:
-# * better format for hyperparameter optimization text file
+# ejecta. This script includes the following trainable models (specified by the
+# 'model_name' input):
+# * simple_CNN : a supervised CNN with many adjustable hyperparameters
+# * autoencoder : trains an unsupervised convolutional autoencoder to 
+#                 extract features from the images, and trains a fully-connected
+#                 neural network to classify images based on extracted features
+# * various supervised pretrained models, including: vgg16, vgg19, ResNet50,
+#   InceptionV3, Xception, InceptionResNsetV2
+# * fine_tuning : loads the weights and architecture of a trained model
+#   (specified by the 'model_init' input) and retrains the model with a very
+#   small learning rate
 #
 # ==============================================================================
 
 # -- inputs --------------------------------------------------------------------
 
 output_dir = './plots210527-all-2/'
+
+data_dir = './data_all/'
 # data_dir = './data_orig/'
 # data_dir = './data_gabor/gabor-'
-data_dir = './data_all/'
-do_test = False # >> validate or test
-# data_dir = './data_augmented/'
+
+do_test = False # >> run on validation or test set
+
 # >> model_name can be 'simple_CNN', 'autoencoder', 'vgg16', 'vgg19', 'ResNet50'
-#    'InceptionV3', 'Xception', 'fine_tuning', 'InceptionResNetV2'
+#    'InceptionV3', 'Xception', 'InceptionResNetV2', 'fine_tuning'
+model_name = 'ResNet50'
+# model_name = 'vgg19'
 pretrained_models = ['vgg16', 'vgg19', 'ResNet50',
     'InceptionV3', 'Xception', 'fine_tuning', 'InceptionResNetV2']
-# model_name = 'vgg19'
-model_name = 'ResNet50'
+
 output_rad = False
 width, height = 224, 224
 reduction_factor = 0.
@@ -48,11 +56,13 @@ hyperparam_opt_diag = False
 # >> train model?
 run_model = True
 model_init = './vgg19_model.h5'
+
+# >> data augmentation options
 data_aug = False
 data_aug_factor = 3
-rot_range = 360
-b_range = [0.5, 1.5]
-hor_flip, ver_flip = True, True
+rot_range = 360 # >> 
+b_range = [0.5, 1.5] # >> brightness range
+hor_flip, ver_flip = True, True # >> horizontal, vertical flipping
 
 # >> plot results?
 plot = True
