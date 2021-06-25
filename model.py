@@ -1,3 +1,12 @@
+# ==============================================================================
+#
+# 20210624 - model.py
+# Functions to build and train CNNs to detect ejecta in MRO images of simple
+# craters.
+# / Emma Chickles
+#
+# ==============================================================================
+
 import numpy as np
 from skimage.filters import gabor_kernel
 import matplotlib.pyplot as plt
