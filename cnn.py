@@ -17,6 +17,16 @@
 #   (specified by the 'model_init' input) and retrains the model with a very
 #   small learning rate
 #
+# In addition to inputs like output directory (output_dir), directory
+# containing the images (data_dir), and other settings, there is also the
+# hyperparameter directionary (p). 
+#
+# The code itself is divided into three main sections:
+# 1) Load and preprocess data
+# 2) Hyperparameter optimization
+# 3) Train model
+# 4) Plot results
+#
 # ==============================================================================
 
 # -- inputs --------------------------------------------------------------------
@@ -37,8 +47,8 @@ pretrained_models = ['vgg16', 'vgg19', 'ResNet50',
     'InceptionV3', 'Xception', 'fine_tuning', 'InceptionResNetV2']
 
 output_rad = False
-width, height = 224, 224
-reduction_factor = 0.
+width, height = 224, 224 # >> dimension of images
+reduction_factor = 0. 
 
 # >> do preprocessing?
 preprocess_norm = False
@@ -51,16 +61,18 @@ gabor_weights = False
 
 # >> do hyperparameter optimization?
 hyperparam_opt = False
-hyperparam_opt_diag = False
+hyperparam_opt_diag = False # >> makes correlation matrix plot
 
 # >> train model?
 run_model = True
+
+# >> loads weights trained from a previous run of cnn.py
 model_init = './vgg19_model.h5'
 
-# >> data augmentation options
-data_aug = False
-data_aug_factor = 3
-rot_range = 360 # >> 
+# >> data augmentation options (still debugging)
+data_aug = False # >> do data augmentation?
+data_aug_factor = 3 # >> factor to increase data size
+rot_range = 360 # >> rotation range in degrees
 b_range = [0.5, 1.5] # >> brightness range
 hor_flip, ver_flip = True, True # >> horizontal, vertical flipping
 
@@ -72,20 +84,21 @@ plot = True
 # >> parameter set for run_model
 if model_name == 'simple_CNN' or model_name == 'autoencoder':
     p = {'num_conv_blocks': 5,
-     'dropout': 0.1,
-     'kernel_size': 5,
-     'activation': 'elu',
-     'num_dense': 1,
-     'dense_units': 128,
-     'lr': 0.000007,
-     'epochs': 10,
-     'batch_size': 32,
-     'kernel_initializer': 'glorot_normal',
-     'num_consecutive': 2,
-     'latent_dim': 30,
-     'l1': 0.0,
-     'l2': 0.0,
-     'num_filters': [16, 16, 32, 32, 64], 'batch_norm': 1}
+         'dropout': 0.1,
+         'kernel_size': 5,
+         'activation': 'elu',
+         'num_dense': 1,
+         'dense_units': 128,
+         'lr': 0.000007,
+         'epochs': 10,
+         'batch_size': 32,
+         'kernel_initializer': 'glorot_normal',
+         'num_consecutive': 2,
+         'latent_dim': 30,
+         'l1': 0.0,
+         'l2': 0.0,
+         'num_filters': [16, 16, 32, 32, 64],
+         'batch_norm': 1}
     
 else:
     p = {'num_pretrained_layers': None, 'lr': 1e-6, 'activation': 'elu',
@@ -125,9 +138,9 @@ from itertools import product
 import random
 from tensorflow.keras.applications.vgg19 import preprocess_input   
 
-# ------------------------------------------------------------------------------
+# :: load and preprocess data :::::::::::::::::::::::::::::::::::::::::::::::::
 
-# >> get training and testing set
+# >> load training and validation/testing set
 x_train = np.load(data_dir + 'x_train.npy').astype('float32')
 if do_test:
     fname = 'x_test.npy'
