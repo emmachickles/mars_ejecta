@@ -57,7 +57,8 @@ preprocess_balance_val = True # >> ensure validation set is balanced
 remove_crater = False # >> requires an array of radii and centers in x and y
 
 # preprocess_gabor = False # >> not in use
-gabor_weights = False
+gabor_weights = False # >> initializes the weights of the first conv layer
+                      # >> with gabor filter kernels
 
 # >> do hyperparameter optimization?
 hyperparam_opt = False
