@@ -22,15 +22,17 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 def set_gabor_weights(model, bank_freq=[0.25, 0.375, 0.5, 0.675],
                       layer_num=[1], n_stds=0.2):
-    '''layer.weights include [weights, biases], where
+    '''
+    Initializes the filters of the first convolutional layer of a Keras model
+    with a bank of Gabor filters.
+    
+    The model's layer.weights include [weights, biases], where
     weights have shape (kernel_size, kernel_size, channels, fiters) and
     biases have shape (filters)
     
     cv2 also has a get_gabor_kernel function where you can specify the number
-    of pixels in kernel. I'm unfortunately using skimage, so I set n_stds=0.5
-    to fix pixel size as (3 x 3 pixels). So this is hardwired! :( 
-        
-    Currently, this sets the same Gabor filter for all channels
+    of pixels in kernel. I'm unfortunately using skimage, so I set n_stds=0.2
+    to fix pixel size as (3 x 3 pixels). So currently the kernel size is hardwired!
     '''
     
     for num in layer_num:
@@ -66,14 +68,13 @@ def normalize(x):
     return x
 
 def standardize(x):
-
+    '''Sets the mean to 0 and the standard deviation to 1.'''
     avg = np.mean(np.mean(x, axis=2, keepdims=True), axis=1, keepdims=True)
     x += -avg
     stdevs = np.std(np.std(x, axis=2, keepdims=True), axis=1, keepdims=True)
     stdevs[ np.nonzero(stdevs == 0.) ] = 1e-8
     x = x / stdevs
     return x
-
 
 def plot_test_set(x_val, y_val, y_pred, out, output_rad=False, draw_circ=False,
                   width=500, height=500, nrows=5):
