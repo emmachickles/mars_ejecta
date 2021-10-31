@@ -1,17 +1,8 @@
-# ==============================================================================
-#
-# 20210624 - model.py
-# Functions to build and train CNNs to detect ejecta in MRO images of simple
-# craters.
-# / Emma Chickles
-#
-# ==============================================================================
-
 import numpy as np
 from skimage.filters import gabor_kernel
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from tensorflow.keras.models import Model
+from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import *
 from tensorflow.keras import backend as K
 from tensorflow.keras import regularizers
@@ -22,17 +13,15 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 def set_gabor_weights(model, bank_freq=[0.25, 0.375, 0.5, 0.675],
                       layer_num=[1], n_stds=0.2):
-    '''
-    Initializes the filters of the first convolutional layer of a Keras model
-    with a bank of Gabor filters.
-    
-    The model's layer.weights include [weights, biases], where
+    '''layer.weights include [weights, biases], where
     weights have shape (kernel_size, kernel_size, channels, fiters) and
     biases have shape (filters)
     
     cv2 also has a get_gabor_kernel function where you can specify the number
-    of pixels in kernel. I'm unfortunately using skimage, so I set n_stds=0.2
-    to fix pixel size as (3 x 3 pixels). So currently the kernel size is hardwired!
+    of pixels in kernel. I'm unfortunately using skimage, so I set n_stds=0.5
+    to fix pixel size as (3 x 3 pixels). So this is hardwired! :( 
+        
+    Currently, this sets the same Gabor filter for all channels
     '''
     
     for num in layer_num:
@@ -68,13 +57,14 @@ def normalize(x):
     return x
 
 def standardize(x):
-    '''Sets the mean to 0 and the standard deviation to 1.'''
+
     avg = np.mean(np.mean(x, axis=2, keepdims=True), axis=1, keepdims=True)
     x += -avg
     stdevs = np.std(np.std(x, axis=2, keepdims=True), axis=1, keepdims=True)
     stdevs[ np.nonzero(stdevs == 0.) ] = 1e-8
     x = x / stdevs
     return x
+
 
 def plot_test_set(x_val, y_val, y_pred, out, output_rad=False, draw_circ=False,
                   width=500, height=500, nrows=5):
@@ -137,18 +127,18 @@ def plot_input_output(x_val, x_pred, output_dir, model_name='',
         ax[i,0].set_xlim([0, width])
         ax[i,0].set_ylim([0, height])
         ax[i,0].imshow( np.reshape(x_val[i], (width, height)), cmap='gray')
-        ax[i,0].set_xticklabels([])
-        ax[i,0].set_yticklabels([])
+        # ax[i,0].set_xticklabels([])
+        # ax[i,0].set_yticklabels([])
         
         ax[i,1].set_xlim([0, width])
         ax[i,1].set_ylim([0, height])
         ax[i,1].imshow( np.reshape(x_pred[i], (width, height)), cmap='gray')
-        ax[i,1].set_xticklabels([])
-        ax[i,1].set_yticklabels([])        
+        # ax[i,1].set_xticklabels([])
+        # ax[i,1].set_yticklabels([])        
 
     plt.tight_layout()
     plt.tight_layout()
-    fig.savefig(output_dir+model_name+'_input_output.png')
+    fig.savefig(output_dir+model_name+'_input_output.png', dpi=300)
 
 def save_model_summary(output_dir, model, prefix=''):
     with open(output_dir + prefix + 'model_summary.txt', 'a') as f:
@@ -171,7 +161,8 @@ def plot_intermediate_activations(x_val, model, inds=[0], output_dir='./',
         ax.imshow(np.squeeze(x_val[ind], axis=-1))
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-        fig.savefig(output_dir + 'intermed_act_img'+str(i)+'_0input.png')
+        fig.savefig(output_dir + 'intermed_act_img'+str(i)+'_0input.png',
+                    dpi=300)
         plt.close()
 
         for j in range(len(activations)):
@@ -200,7 +191,7 @@ def plot_intermediate_activations(x_val, model, inds=[0], output_dir='./',
 
             fig.tight_layout()
             fig.savefig(output_dir+model_name+'_intermed_act_img'+str(i)+'_'+\
-                        str(j+1)+name+'.png')
+                        str(j+1)+name+'.png', dpi=300)
             plt.close()
 
 def visualize_filters(model, model_name, nrows=4, ncols=4, output_dir='./',
@@ -217,7 +208,7 @@ def visualize_filters(model, model_name, nrows=4, ncols=4, output_dir='./',
             ax[r,c].set_xticklabels([])
             ax[r,c].set_yticklabels([])
     fig.colorbar(im, ax=ax[:,c])            
-    fig.savefig(output_dir+model_name+'_layer0_weights.png')
+    fig.savefig(output_dir+model_name+'_layer0_weights.png', dpi=300)
     
 # def plot_tsne():        
             
@@ -283,7 +274,9 @@ def simple_cnn(x_train, y_train, x_val, y_val, p):
 
     return history, model
 
-def do_fine_tuning(x_train, y_train, x_val, y_val, model_name, p, model_init):    
+def do_fine_tuning(x_train, y_train, x_val, y_val, model_name, p, model_init,
+                   data_aug=False, rot_range=360, b_range=[0.5,1.5],
+                   hor_flip=False, ver_flip=False):    
     print('Loading weights')
     model = load_model(model_init)
     opt = optimizers.Adam(lr=p['lr'])
@@ -302,6 +295,29 @@ def do_fine_tuning(x_train, y_train, x_val, y_val, model_name, p, model_init):
         history = model.fit(x_train, y_train, batch_size=p['batch_size'],
                             epochs=p['epochs'], shuffle=True,
                             validation_data=(x_val, y_val))
+
+# def extract_feats():
+    
+#     if model_name == 'vgg16':
+#         from tensorflow.keras.applications.vgg16 import VGG16 as model_pretrained
+#         from tensorflow.keras.applications.vgg16 import preprocess_input
+#     elif model_name == 'vgg19':
+#         from tensorflow.keras.applications.vgg19 import VGG19 as model_pretrained
+#         from tensorflow.keras.applications.vgg19 import preprocess_input
+#     elif model_name == 'ResNet50':
+#         from tensorflow.keras.applications.resnet import ResNet50 as model_pretrained
+#         from tensorflow.keras.applications.resnet import preprocess_input
+#     elif model_name == 'Xception':
+#         from tensorflow.keras.applications.xception import Xception as model_pretrained
+#         from tensorflow.keras.applications.xception import preprocess_input
+#     elif model_name == 'InceptionV3':
+#         from tensorflow.keras.applications.inception_v3 import InceptionV3 as model_pretrained
+#         from tensorflow.keras.applications.inception_v3 import preprocess_input
+#     elif model_name == 'InceptionResNetV2':
+#         from tensorflow.keras.applications import InceptionResNetV2 as model_pretrained
+#         from tensorflow.keras.applications.inception_resnet_v2 import preprocess_input 
+        
+    
 
 def run_pretrained_model(x_train, y_train, x_val, y_val, model_name, p,
                          width=224, height=224, data_aug=False, rot_range=360,
@@ -326,7 +342,8 @@ def run_pretrained_model(x_train, y_train, x_val, y_val, model_name, p,
         from tensorflow.keras.applications import InceptionResNetV2 as model_pretrained
         from tensorflow.keras.applications.inception_resnet_v2 import preprocess_input 
         
-    pretrained_init = model_pretrained(weights='imagenet', include_top=False,
+    pretrained_init = model_pretrained(weights='imagenet',
+                                       include_top=p['include_top'],
                                        input_shape=(224,224,3))
     # # >> random initialization
     # random_init = model_pretrained(weights=None, include_top=False,
@@ -340,7 +357,11 @@ def run_pretrained_model(x_train, y_train, x_val, y_val, model_name, p,
         if type(p['num_pretrained_layers']) == type(None):
             p['num_pretrained_layers'] = len(pretrained_init.layers)+1
             
-        for i in range(1, len(pretrained_init.layers)):
+        if p['include_top']:
+            max_ind = len(pretrained_init.layers)-1
+        else:
+            max_ind = len(pretrained_init.layers)
+        for i in range(1, max_ind):
             
             # # >> check whether to use pretrained or random weights
             # if i < p['num_pretrained_layers']:
@@ -357,8 +378,9 @@ def run_pretrained_model(x_train, y_train, x_val, y_val, model_name, p,
                 x = layer(input_img)
             else:
                 x = layer(x)
-                
-        x = Flatten()(x)
+            
+        if not p['include_top']:
+            x = Flatten()(x)
         for i in range(p['num_dense']):
             x = Dense(4096, activation=p['activation'],
                       kernel_initializer=p['kernel_initializer'])(x)
@@ -440,17 +462,10 @@ def autoencoder(x_train, x_val, p):
     model.compile(loss='mean_squared_error', optimizer=opt)
     model.summary()
     
-    if data_aug:
-        aug = ImageDataGenerator(rotation_range=rot_range, brightness_range=b_range,
-                                 vertical_flip=ver_flip, horizontal_flip=hor_flip)
-        history = model.fit_generator(aug.flow(x_train, y_train, batch_size=p['batch_size']),
-                                      validation_data=(x_val, y_val),
-                                      steps_per_epoch=len(x_train)//p['batch_size'],
-                                      epochs=p['epochs'])
-    else:
-        history = model.fit(x_train, x_train, epochs=p['epochs'],
-                            batch_size=p['batch_size'],
-                            shuffle=True, validation_data=(x_val, x_val))    
+    history = model.fit(x_train, x_train, epochs=p['epochs'],
+                        batch_size=p['batch_size'],
+                        shuffle=True, validation_data=(x_val, x_val))    
+    
     return history, model
 
 def mlp(model, x_train, y_train, x_val, y_val, p, p_mlp,
@@ -526,7 +541,7 @@ def plot_latent_space(bottleneck, output_dir='./', model_name='./', log=True):
         ax.set_xticklabels([])
     plt.subplots_adjust(hspace=0, wspace=0)
 
-    plt.savefig(output_dir+model_name+'_latent_space.png')
+    plt.savefig(output_dir+model_name+'_latent_space.png', dpi=300)
     plt.close(fig)    
     
 def plot_saliency_maps(model, x_val, bottleneck, bottleneck_ind, inds,
@@ -542,7 +557,7 @@ def plot_saliency_maps(model, x_val, bottleneck, bottleneck_ind, inds,
             ax.set_xticklabels([])
             ax.set_yticklabels([])
             plt.savefig(output_dir + model_name + '_saliency_filter'+str(i)+\
-                        '_ind'+str(ind)+'.png')
+                        '_ind'+str(ind)+'.png', dpi=300)
             plt.close(fig)
             
             if heatmap:
@@ -553,7 +568,7 @@ def plot_saliency_maps(model, x_val, bottleneck, bottleneck_ind, inds,
                 ax.set_xticklabels([])
                 ax.set_yticklabels([])
                 plt.savefig(output_dir + model_name + '_heatmap_filter'+str(i)+\
-                            '_ind'+str(ind)+'.png')
+                            '_ind'+str(ind)+'.png', dpi=300)
                 plt.close(fig)
                         
 def plot_saliency_maps_tf(model, x_val, y_val, y_pred, output_dir, model_name,
@@ -562,6 +577,7 @@ def plot_saliency_maps_tf(model, x_val, y_val, y_pred, output_dir, model_name,
     from tf_keras_vis.saliency import Saliency
     from tf_keras_vis.gradcam import Gradcam
     from tf_keras_vis.utils import normalize
+    from matplotlib import cm
     
     # >> Find true postitives (TP), true negatives (TN), false positives (FP)
     # >> and false negatives (FN)
@@ -614,7 +630,7 @@ def plot_saliency_maps_tf(model, x_val, y_val, y_pred, output_dir, model_name,
     ax[1][1].set_title('True positive')
     ax[1][1].imshow(saliency_map[3], cmap='jet')
     plt.tight_layout()
-    plt.savefig(output_dir+model_name+'_saliency_non_ejecta.png')
+    plt.savefig(output_dir+model_name+'_saliency_non_ejecta.png', dpi=300)
     
     saliency_map = saliency(loss_1, X)
     saliency_map = normalize(saliency_map)
@@ -659,7 +675,8 @@ def plot_saliency_maps_tf(model, x_val, y_val, y_pred, output_dir, model_name,
             for col in range(min(ncols, len(X)-ncols*row)):
                 ax[row,col].imshow(saliency_map[row*ncols+col], cmap='jet')
         fig.tight_layout()
-        fig.savefig(output_dir+model_name+'_saliency_'+suffixes[i]+'.png')
+        fig.savefig(output_dir+model_name+'_saliency_'+suffixes[i]+'.png',
+                    dpi=300)
         plt.close()
     
     # -- smoothGrad -----------------------------------------------------------
@@ -678,8 +695,9 @@ def plot_saliency_maps_tf(model, x_val, y_val, y_pred, output_dir, model_name,
     ax[1][0].imshow(saliency_map[2], cmap='jet')
     ax[1][1].set_title('False negative')
     ax[1][1].imshow(saliency_map[3], cmap='jet')
+    f.colorbar(cm.ScalarMappable(cmap='jet'))
     plt.tight_layout()
-    plt.savefig(output_dir+model_name+'_smoothgrad_non_ejecta.png')
+    plt.savefig(output_dir+model_name+'_smoothgrad_non_ejecta.png', dpi=300)
 
     saliency_map = saliency(loss_1,
                             X,
@@ -696,7 +714,7 @@ def plot_saliency_maps_tf(model, x_val, y_val, y_pred, output_dir, model_name,
     ax[1][1].set_title('False negative')
     ax[1][1].imshow(saliency_map[3], cmap='jet')
     plt.tight_layout()
-    plt.savefig(output_dir+model_name+'_smoothgrad_ejecta.png')
+    plt.savefig(output_dir+model_name+'_smoothgrad_ejecta.png', dpi=300)
              
     # -- gradCAM --------------------------------------------------------------
     
@@ -794,7 +812,7 @@ def plot_activation_max(model, bottleneck, bottleneck_ind, inds,
     ax.imshow(np.squeeze(out, -1), cmap='gray')
     ax.set_xticklabels([])
     ax.set_yticklabels([])
-    plt.savefig(output_dir + model_name + '_act_max_all_filters.png')
+    plt.savefig(output_dir + model_name + '_act_max_all_filters.png', dpi=300)
     plt.close(fig)      
     
     latentDim = np.shape(bottleneck)[1]
@@ -804,7 +822,8 @@ def plot_activation_max(model, bottleneck, bottleneck_ind, inds,
         ax.imshow(np.squeeze(out, -1), cmap='gray')
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-        plt.savefig(output_dir + model_name + '_act_max_filt'+str(i)+'.png')
+        plt.savefig(output_dir + model_name + '_act_max_filt'+str(i)+'.png',
+                    dpi=300)
         plt.close(fig)            
         
 def plot_saliency_corner_plot(model, bottleneck, bottleneck_ind, inds, 
@@ -837,7 +856,8 @@ def plot_saliency_corner_plot(model, bottleneck, bottleneck_ind, inds,
             ax.set_xticklabels([])
         plt.subplots_adjust(hspace=0, wspace=0)
     
-        plt.savefig(output_dir+model_name+'_saliency_corner_plot_ind'+str(ind)+'.png')
+        plt.savefig(output_dir+model_name+'_saliency_corner_plot_ind'+str(ind)+'.png',
+                    dpi=300)
         plt.close(fig)                
 
     
@@ -864,24 +884,25 @@ def hyperparam_opt_diagnosis(analyze_object, output_dir, model_name):
         analyze_object.plot_line(key_list[i])
         plt.xlabel('round')
         plt.ylabel(label_list[i])
-        plt.savefig(output_dir + model_name + '_'+label_list[i] + '_plot.png')
+        plt.savefig(output_dir + model_name + '_'+label_list[i] + '_plot.png',
+                    dpi=300)
     
     # >> kernel density estimation
     analyze_object.plot_kde('val_loss')
     plt.xlabel('val_loss')
     plt.ylabel('kernel density\nestimation')
-    plt.savefig(output_dir + model_name + '_kde.png')
+    plt.savefig(output_dir + model_name + '_kde.png', dpi=300)
     
     analyze_object.plot_hist('val_loss', bins=50)
     plt.xlabel('val_loss')
     plt.ylabel('num observations')
     plt.tight_layout()
-    plt.savefig(output_dir + model_name + '_hist_val_loss.png')
+    plt.savefig(output_dir + model_name + '_hist_val_loss.png', dpi=300)
     
     # >> heat map correlation
     analyze_object.plot_corr('val_loss', ['acc', 'loss', 'val_acc'])
     plt.tight_layout()
-    plt.savefig(output_dir + model_name + '_correlation_heatmap.png')
+    plt.savefig(output_dir + model_name + '_correlation_heatmap.png', dpi=300)
     
     # >> get best parameter set
     hyperparameters = list(analyze_object.data.columns)
@@ -902,6 +923,7 @@ def correlation_heatmap(res, output_dir, model_name):
     plt.figure(figsize=(15,15))
     sn.heatmap(corrMatrix, annot=True)
     plt.tight_layout()
-    plt.savefig(output_dir + model_name + '_hyperparameter_correlation.png')
+    plt.savefig(output_dir + model_name + '_hyperparameter_correlation.png',
+                dpi=300)
 
     return res
