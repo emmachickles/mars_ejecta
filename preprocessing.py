@@ -53,7 +53,8 @@ def standardize(x):
 # =============================================================================
 
 def ejecta_detection_preprocessing(imgpaths=['/mnt/d6/cfassett/jpg/',
-                                             '/mnt/d6/cfassett/jpg2/'], out='./',
+                                             '/mnt/d6/cfassett/jpg2/'],
+                                   out='./',
                                    width=500, height=500, train_partition=0.9,
                                    val_partition=0.05, test_partition=0.05,
                                    resize_method='crop',
@@ -68,7 +69,8 @@ def ejecta_detection_preprocessing(imgpaths=['/mnt/d6/cfassett/jpg/',
         * data_augmentation : deprecated 112620.'''
 
 
-    skip = ['08-001140+P18_007974_1897_XN_09N180W_B18_016558_1895_XI_09N180W-DEM-001_ctx-reproj-strchd_1040.jpg']
+    skip = ['08-001140+P18_007974_1897_XN_09N180W_B18_016558_1895_XI_'+\
+            '09N180W-DEM-001_ctx-reproj-strchd_1040.jpg']
     
     # >> read Caleb's Excel sheet
     df = pd.read_excel(classification_excel)
@@ -85,9 +87,9 @@ def ejecta_detection_preprocessing(imgpaths=['/mnt/d6/cfassett/jpg/',
     orig_shapes = []
     orig_shapes_ejecta = []
     orig_labels = []
-    orig_labels_nan = []
+    orig_labels_nan = [] # >> unable to open img
     fnames_failed = []
-    orig_labels_failed = []
+    orig_labels_failed = [] # >> in skip or no attribute
     
     # -- Loop through images --------------------------------------------------
     count = 0
@@ -158,14 +160,14 @@ def ejecta_detection_preprocessing(imgpaths=['/mnt/d6/cfassett/jpg/',
                 num_rows = img.shape[0]
                 num_cols = img.shape[1]
                 
-                if resize_method == 'crop':
+                if resize_method == 'crop': # -- cropping method --------------
                     if num_rows > num_cols:
                         row_ind = int(num_rows/2 - num_cols/2)
                         img = img[row_ind : row_ind+num_cols]
                     elif num_cols > num_rows:
                         col_ind = int(num_cols/2 - num_rows/2)
                         img = img[:, col_ind : col_ind+num_rows]
-                elif resize_method == 'pad':
+                elif resize_method == 'pad': # -- padding method --------------
                     if num_rows > num_cols:
                         col_pad = int(num_rows/2 - num_cols/2)
                         padding = np.ones((num_rows,col_pad))*np.mean(img)
@@ -255,9 +257,13 @@ def ejecta_detection_preprocessing(imgpaths=['/mnt/d6/cfassett/jpg/',
     np.savetxt(out+'y_train.txt', y_train, delimiter=',', fmt='%d')
     np.savetxt(out+'y_val.txt', y_val, delimiter=',', fmt='%d')    
     np.savetxt(out+'y_test.txt', y_test, delimiter=',', fmt='%d')
-    np.savetxt('fnames_train.txt', fnames_train, delimiter=',', fmt='%s')
-    np.savetxt('fnames_val.txt', fnames_val, delimiter=',', fmt='%s')    
-    np.savetxt('fnames_test.txt', fnames_test, delimiter=',', fmt='%s')
+    np.savetxt(out+'fnames_train.txt', fnames_train, delimiter=',', fmt='%s')
+    np.savetxt(out+'fnames_val.txt', fnames_val, delimiter=',', fmt='%s')    
+    np.savetxt(out+'fnames_test.txt', fnames_test, delimiter=',', fmt='%s')
+    np.savetxt(out+'fnames_fail_attrib.txt', np.array(orig_labels_failed),
+               deimiter=',', fmt='%s')
+    np.savetxt(out+'fnames_fail_img.txt', np.array(orig_labels_nan),
+               delimiter=',', fmt='%s')
 
     # -- make some plots ------------------------------------------------------
     x_train_plot = x_train.astype(np.float32)
@@ -286,7 +292,7 @@ def ejecta_detection_preprocessing(imgpaths=['/mnt/d6/cfassett/jpg/',
     plt.savefig(out + 'resized_ejecta_images.png')
     plt.close()
     
-    return x_train, x_val, x_test, y_train, y_val, y_test, fnames_train, fnames_test, orig_shapes, orig_labels, orig_labels_nan, orig_labels_failed, orig_shapes_ejecta
+    # return x_train, x_val, x_test, y_train, y_val, y_test, fnames_train, fnames_test, orig_shapes, orig_labels, orig_labels_nan, orig_labels_failed, orig_shapes_ejecta
 
 def quality_assessment_preprocessing():
     '''
@@ -638,8 +644,7 @@ def get_resized_img(gdmp, width, height, padding=True):
 # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 if __name__ == '__main__':
-    x_train, x_val, x_test, y_train, y_val, y_test, fnames_train, fnames_test, orig_shapes, orig_labels, orig_labels_nan, orig_labels_failed, orig_shapes_ejecta =\
-        ejecta_detection_preprocessing(width=224, height=224, data_augmentation=False)
+    ejecta_detection_preprocessing(width=224, height=224, resize_method='crop')
     
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
