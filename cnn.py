@@ -1,54 +1,35 @@
 # ==============================================================================
 #
 # 20200914 - cnn.py
-# Train a CNN for binary classification of ejecta preservation.
+# VGG-inspired CNN for binary classification of ejecta preservation.
 # / Emma Chickles
 # Trains a convolutional neural network on scaled and normalized images to
 # output a single value (0 or 1) representing the presence or absence of crater
-# ejecta. This script includes the following trainable models (specified by the
-# 'model_name' input):
-# * simple_CNN : a supervised CNN with many adjustable hyperparameters
-# * autoencoder : trains an unsupervised convolutional autoencoder to 
-#                 extract features from the images, and trains a fully-connected
-#                 neural network to classify images based on extracted features
-# * various supervised pretrained models, including: vgg16, vgg19, ResNet50,
-#   InceptionV3, Xception, InceptionResNsetV2
-# * fine_tuning : loads the weights and architecture of a trained model
-#   (specified by the 'model_init' input) and retrains the model with a very
-#   small learning rate
+# ejecta.
+# Note that this CNN doesn't initialize with the pretrained weights from VGG,
+# just uses the same architecture.
 #
-# In addition to inputs like output directory (output_dir), directory
-# containing the images (data_dir), and other settings, there is also the
-# hyperparameter directionary (p). 
-#
-# The code itself is divided into three main sections:
-# 1) Load and preprocess data
-# 2) Hyperparameter optimization
-# 3) Train model
-# 4) Plot results
+# TODO:
+# * better format for hyperparameter optimization text file
 #
 # ==============================================================================
 
 # -- inputs --------------------------------------------------------------------
 
-output_dir = './plots210527-all-2/'
-
-data_dir = './data_all/'
-# data_dir = './data_orig/'
+output_dir = './plots210504/'
+data_dir = './data_orig/'
 # data_dir = './data_gabor/gabor-'
-
-do_test = False # >> run on validation or test set
-
+# data_dir = './data_all/'
+do_test = False # >> validate or test
+# data_dir = './data_augmented/'
 # >> model_name can be 'simple_CNN', 'autoencoder', 'vgg16', 'vgg19', 'ResNet50'
-#    'InceptionV3', 'Xception', 'InceptionResNetV2', 'fine_tuning'
-model_name = 'ResNet50'
-# model_name = 'vgg19'
+#    'InceptionV3', 'Xception', 'fine_tuning', 'InceptionResNetV2'
 pretrained_models = ['vgg16', 'vgg19', 'ResNet50',
     'InceptionV3', 'Xception', 'fine_tuning', 'InceptionResNetV2']
-
+model_name = 'vgg19'
 output_rad = False
-width, height = 224, 224 # >> dimension of images
-reduction_factor = 0. 
+width, height = 224, 224
+reduction_factor = 0.
 
 # >> do preprocessing?
 preprocess_norm = False
@@ -57,25 +38,21 @@ preprocess_balance_val = True # >> ensure validation set is balanced
 remove_crater = False # >> requires an array of radii and centers in x and y
 
 # preprocess_gabor = False # >> not in use
-gabor_weights = False # >> initializes the weights of the first conv layer
-                      # >> with gabor filter kernels
+gabor_weights = False
 
 # >> do hyperparameter optimization?
 hyperparam_opt = False
-hyperparam_opt_diag = False # >> makes correlation matrix plot
+hyperparam_opt_diag = False
 
 # >> train model?
 run_model = True
-
-# >> loads weights trained from a previous run of cnn.py
-model_init = './vgg19_model.h5'
-
-# >> data augmentation options (still debugging)
-data_aug = False # >> do data augmentation?
-data_aug_factor = 3 # >> factor to increase data size
-rot_range = 360 # >> rotation range in degrees
-b_range = [0.5, 1.5] # >> brightness range
-hor_flip, ver_flip = True, True # >> horizontal, vertical flipping
+# model_init = './vgg19_model.h5'
+model_init = output_dir+'vgg19_model.h5'
+data_aug = False
+data_aug_factor = 3
+rot_range = 360
+b_range = [0.5, 1.5]
+hor_flip, ver_flip = True, True
 
 # >> plot results?
 plot = True
@@ -85,26 +62,25 @@ plot = True
 # >> parameter set for run_model
 if model_name == 'simple_CNN' or model_name == 'autoencoder':
     p = {'num_conv_blocks': 5,
-         'dropout': 0.1,
-         'kernel_size': 5,
-         'activation': 'elu',
-         'num_dense': 1,
-         'dense_units': 128,
-         'lr': 0.000007,
-         'epochs': 10,
-         'batch_size': 32,
-         'kernel_initializer': 'glorot_normal',
-         'num_consecutive': 2,
-         'latent_dim': 30,
-         'l1': 0.0,
-         'l2': 0.0,
-         'num_filters': [16, 16, 32, 32, 64],
-         'batch_norm': 1}
+     'dropout': 0.1,
+     'kernel_size': 5,
+     'activation': 'elu',
+     'num_dense': 1,
+     'dense_units': 128,
+     'lr': 0.000007,
+     'epochs': 10,
+     'batch_size': 32,
+     'kernel_initializer': 'glorot_normal',
+     'num_consecutive': 2,
+     'latent_dim': 30,
+     'l1': 0.0,
+     'l2': 0.0,
+     'num_filters': [16, 16, 32, 32, 64], 'batch_norm': 1}
     
 else:
-    p = {'num_pretrained_layers': None, 'lr': 1e-6, 'activation': 'elu',
-         'kernel_initializer': 'glorot_normal', 'batch_size': 32, 'epochs': 40,
-         'trainable': True, 'num_dense': 0, 'gabor': False}
+    p = {'num_pretrained_layers': None, 'lr': 1e-6, 'activation': 'relu',
+         'kernel_initializer': 'glorot_normal', 'batch_size': 32, 'epochs': 200,
+         'trainable': False, 'num_dense': 0, 'gabor': False, 'include_top': True}
     
 p_mlp = {'hidden_units': [32, 16, 8, 4], 'epochs': 50, 'lr':0.0001}
     
@@ -139,9 +115,9 @@ from itertools import product
 import random
 from tensorflow.keras.applications.vgg19 import preprocess_input   
 
-# :: load and preprocess data :::::::::::::::::::::::::::::::::::::::::::::::::
+# ------------------------------------------------------------------------------
 
-# >> load training and validation/testing set
+# >> get training and testing set
 x_train = np.load(data_dir + 'x_train.npy').astype('float32')
 if do_test:
     fname = 'x_test.npy'
@@ -407,6 +383,8 @@ if hyperparam_opt_diag:
 
 # :: train model ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+pdb.set_trace()    
+
 if run_model:
     if model_name == 'simple_CNN':
         history, model = simple_cnn(x_train, y_train, x_val, y_val, p)
@@ -428,7 +406,8 @@ if run_model:
     
     elif model_name == 'fine_tuning':
         history, model = do_fine_tuning(x_train, y_train, x_val, y_val, model_name,
-                                        p, model_init)
+                                        p, model_init, data_aug,  rot_range,
+                                        b_range, hor_flip, ver_flip)
         model.save(output_dir+model_name+'_model.h5')
     
     else:
@@ -449,7 +428,7 @@ if plot:
     # >> detect ejecta in validation set
     if model_name == 'autoencoder':
         bottleneck_val = np.loadtxt(output_dir+model_name+'bottleneck_val.txt')
-        bottleneck_train = np.loadtxt(output_dir +model_name+'bottleneck_train.txt')    
+        bottleneck_train = np.loadtxt(output_dir+model_name+'bottleneck_train.txt')    
         x_pred = model.predict(x_val)
         y_pred = model_mlp.predict(bottleneck_val)
     else:
